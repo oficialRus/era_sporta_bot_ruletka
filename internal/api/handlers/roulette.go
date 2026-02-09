@@ -15,9 +15,9 @@ import (
 )
 
 type RouletteHandler struct {
-	rouletteSvc  *service.RouletteService
-	userSvc      *service.UserService
-	adminNotify  notifier.AdminNotifier
+	rouletteSvc *service.RouletteService
+	userSvc     *service.UserService
+	adminNotify notifier.AdminNotifier
 }
 
 func NewRouletteHandler(rouletteSvc *service.RouletteService, userSvc *service.UserService, adminNotify notifier.AdminNotifier) *RouletteHandler {
@@ -81,11 +81,11 @@ func (h *RouletteHandler) Config(c *gin.Context) {
 	}
 
 	type prizeDTO struct {
-		ID       int     `json:"id"`
-		Name     string  `json:"name"`
-		Type     string  `json:"type"`
-		Value    float64 `json:"value"`
-		Weight   int     `json:"weight"`
+		ID     int     `json:"id"`
+		Name   string  `json:"name"`
+		Type   string  `json:"type"`
+		Value  float64 `json:"value"`
+		Weight int     `json:"weight"`
 	}
 
 	list := make([]prizeDTO, len(prizes))
@@ -117,11 +117,11 @@ func (h *RouletteHandler) History(c *gin.Context) {
 	}
 
 	type spinDTO struct {
-		ID         int64   `json:"id"`
-		PrizeName  string  `json:"prize_name"`
-		PrizeType  string  `json:"prize_type"`
-		Value      float64 `json:"value"`
-		CreatedAt  string  `json:"created_at"`
+		ID        int64   `json:"id"`
+		PrizeName string  `json:"prize_name"`
+		PrizeType string  `json:"prize_type"`
+		Value     float64 `json:"value"`
+		CreatedAt string  `json:"created_at"`
 	}
 	list := make([]spinDTO, len(history))
 	for i, s := range history {

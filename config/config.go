@@ -7,26 +7,30 @@ import (
 )
 
 type Config struct {
-	BotToken             string
-	AdminTelegramChatID  int64
-	WebAppURL            string
-	APIPort              int
-	DatabaseURL          string
-	RedisURL             string
-	RouletteSpinLimit    int
-	RouletteLockTTLSec   int
+	BotToken            string
+	AdminTelegramChatID int64
+	TelegramChannelID   int64
+	TelegramChannelURL  string
+	WebAppURL           string
+	APIPort             int
+	DatabaseURL         string
+	RedisURL            string
+	RouletteSpinLimit   int
+	RouletteLockTTLSec  int
 }
 
 func Load() (*Config, error) {
 	c := &Config{
-		BotToken:             getEnv("BOT_TOKEN", ""),
-		AdminTelegramChatID:  getEnvInt64("ADMIN_TELEGRAM_CHAT_ID", 0),
-		WebAppURL:            getEnv("WEBAPP_URL", "https://your-domain.com/webapp"),
-		APIPort:              getEnvInt("API_PORT", 8080),
-		DatabaseURL:          getEnv("DATABASE_URL", ""),
-		RedisURL:             getEnv("REDIS_URL", ""),
-		RouletteSpinLimit:    getEnvInt("ROULETTE_SPIN_LIMIT_PER_USER", 1),
-		RouletteLockTTLSec:   getEnvInt("ROULETTE_LOCK_TTL_SEC", 10),
+		BotToken:            getEnv("BOT_TOKEN", ""),
+		AdminTelegramChatID: getEnvInt64("ADMIN_TELEGRAM_CHAT_ID", 0),
+		TelegramChannelID:   getEnvInt64("TELEGRAM_CHANNEL_ID", 0),
+		TelegramChannelURL:  getEnv("TELEGRAM_CHANNEL_URL", ""),
+		WebAppURL:           getEnv("WEBAPP_URL", "https://your-domain.com/webapp"),
+		APIPort:             getEnvInt("API_PORT", 8080),
+		DatabaseURL:         getEnv("DATABASE_URL", ""),
+		RedisURL:            getEnv("REDIS_URL", ""),
+		RouletteSpinLimit:   getEnvInt("ROULETTE_SPIN_LIMIT_PER_USER", 1),
+		RouletteLockTTLSec:  getEnvInt("ROULETTE_LOCK_TTL_SEC", 10),
 	}
 	return c, nil
 }

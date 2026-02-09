@@ -13,13 +13,13 @@ import (
 	"era_sporta_bot_ruletka/internal/api"
 	"era_sporta_bot_ruletka/internal/api/handlers"
 	"era_sporta_bot_ruletka/internal/bot"
-	"era_sporta_bot_ruletka/internal/notifier"
 	"era_sporta_bot_ruletka/internal/db"
+	"era_sporta_bot_ruletka/internal/notifier"
 	"era_sporta_bot_ruletka/internal/repository"
 	"era_sporta_bot_ruletka/internal/service"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
 )
 

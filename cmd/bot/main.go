@@ -55,7 +55,7 @@ func run() error {
 	userSvc := service.NewUserService(userRepo, spinRepo)
 
 	notifier := bot.NewNotifier(tgBot, cfg.AdminTelegramChatID)
-	handler := bot.NewHandler(tgBot, userSvc, notifier, cfg.WebAppURL)
+	handler := bot.NewHandler(tgBot, userSvc, notifier, cfg.WebAppURL, cfg.TelegramChannelID, cfg.TelegramChannelURL)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

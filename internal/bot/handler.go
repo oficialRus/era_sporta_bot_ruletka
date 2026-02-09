@@ -8,28 +8,38 @@ import (
 
 	"era_sporta_bot_ruletka/internal/domain"
 	"era_sporta_bot_ruletka/internal/service"
+	"era_sporta_bot_ruletka/internal/telegram"
 
-	"github.com/jackc/pgx/v5"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
-	msgNeedPhone     = "👋 Добро пожаловать! Чтобы получить доступ к рулетке с бонусами, нажмите кнопку ниже."
-	msgShareOfficial = "Нажмите кнопку ниже, чтобы поделиться номером из вашего аккаунта Telegram. Принимается только официальный контакт."
+	msgSubscribe     = "Привет! 👋 Добро пожаловать в Колесо Фортуны от фитнес-клуба «Эра Спорта».\n\nЧтобы крутить рулетку 🎯, нужно выполнить два простых действия.\n\nШаг 1 — подписаться на наш официальный Telegram-канал 🔔\nТам мы публикуем новости клуба, предложения и полезную информацию 💪\n\nКак будете готовы, нажмите кнопку «Я подписался» 👇"
+	msgShareOfficial = "Шаг 2 — номер телефона 📱\n\nНомер нужен, чтобы наш менеджер мог\nсвязаться с вами и подтвердить результат.\n\nМы используем только официальный способ Telegram\nи не передаём номер третьим лицам 🤝\n\nНажмите «Поделиться номером» ниже 👇"
 	msgPhoneSaved    = "✅ Отлично! Номер сохранён. Нажмите кнопку ниже, чтобы открыть приложение и крутить рулетку."
 	msgWelcomeBack   = "👋 С возвращением! Нажмите кнопку ниже, чтобы открыть приложение."
-	msgOpenLocalLink = "Откройте приложение по ссылке (локальная разработка):"
+	promoImagePath   = "C:\\Users\\admin\\.cursor\\projects\\c-Users-admin-Desktop-era-sporta-bot-ruletka\\assets\\c__Users_admin_AppData_Roaming_Cursor_User_workspaceStorage_5a78a1a9780da7868c5979c727fb5fbb_images_ChatGPT_Image_9_____._2026__.__21_46_52-54072f01-081a-4b4a-9d28-be205728631c.png"
 )
 
 type Handler struct {
-	bot       *tgbotapi.BotAPI
-	userSvc   *service.UserService
-	notifier  *Notifier
-	webAppURL string
+	bot        *tgbotapi.BotAPI
+	userSvc    *service.UserService
+	notifier   *Notifier
+	webAppURL  string
+	channelID  int64
+	channelURL string
 }
 
-func NewHandler(bot *tgbotapi.BotAPI, userSvc *service.UserService, notifier *Notifier, webAppURL string) *Handler {
-	return &Handler{bot: bot, userSvc: userSvc, notifier: notifier, webAppURL: webAppURL}
+func NewHandler(bot *tgbotapi.BotAPI, userSvc *service.UserService, notifier *Notifier, webAppURL string, channelID int64, channelURL string) *Handler {
+	return &Handler{
+		bot:        bot,
+		userSvc:    userSvc,
+		notifier:   notifier,
+		webAppURL:  webAppURL,
+		channelID:  channelID,
+		channelURL: channelURL,
+	}
 }
 
 func (h *Handler) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
@@ -63,8 +73,12 @@ func (h *Handler) handleStart(ctx context.Context, chatID int64, from *tgbotapi.
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Новый пользователь — приветствие с inline-кнопкой
-			msg := tgbotapi.NewMessage(chatID, msgNeedPhone)
-			msg.ReplyMarkup = SharePhoneInlineMarkup()
+			if h.channelURL == "" {
+				h.send(chatID, "Канал для подписки не настроен. Напишите администратору.")
+				return
+			}
+			msg := tgbotapi.NewMessage(chatID, msgSubscribe)
+			msg.ReplyMarkup = SubscribeInlineMarkup(h.channelURL)
 			if _, sendErr := h.bot.Send(msg); sendErr != nil {
 				log.Printf("[bot] Send error: %v", sendErr)
 			}
@@ -76,36 +90,68 @@ func (h *Handler) handleStart(ctx context.Context, chatID int64, from *tgbotapi.
 	}
 
 	if user != nil && user.Phone != "" {
-		// Already has phone — кнопка или ссылка (localhost в кнопке Telegram не принимает)
-		msg := tgbotapi.NewMessage(chatID, msgWelcomeBack)
-		if !IsLocalhostURL(h.webAppURL) {
-			msg.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
-		} else {
-			// Ссылка в тексте кликабельна в Telegram Desktop — откроется локально
-			msg.Text = msgOpenLocalLink + "\n" + h.webAppURL
-		}
-		if _, err := h.bot.Send(msg); err != nil {
-			log.Printf("[bot] Send error: %v", err)
-		}
+		// Already has phone — показываем кнопку открытия приложения
+		h.sendAppCard(chatID)
 		return
 	}
 
 	// Need phone — приветствие с inline-кнопкой
-	msg := tgbotapi.NewMessage(chatID, msgNeedPhone)
-	msg.ReplyMarkup = SharePhoneInlineMarkup()
+	if h.channelURL == "" {
+		h.send(chatID, "Канал для подписки не настроен. Напишите администратору.")
+		return
+	}
+	msg := tgbotapi.NewMessage(chatID, msgSubscribe)
+	msg.ReplyMarkup = SubscribeInlineMarkup(h.channelURL)
 	if _, err := h.bot.Send(msg); err != nil {
 		log.Printf("[bot] Send error: %v", err)
 	}
 }
 
-func (h *Handler) handleCallback(_ context.Context, q *tgbotapi.CallbackQuery) {
-	if q.Data == "share_phone" {
+func (h *Handler) handleCallback(ctx context.Context, q *tgbotapi.CallbackQuery) {
+	switch q.Data {
+	case "check_subscribe":
+		if h.channelID == 0 || h.channelURL == "" {
+			h.send(q.Message.Chat.ID, "Канал для подписки не настроен. Напишите администратору.")
+			break
+		}
+		member, err := telegram.IsUserMember(ctx, h.bot.Token, h.channelID, q.From.ID)
+		if err != nil || !member {
+			msg := tgbotapi.NewMessage(q.Message.Chat.ID, "Похоже, вы ещё не подписались. Подпишитесь и нажмите «Я подписался» ещё раз.")
+			msg.ReplyMarkup = SubscribeInlineMarkup(h.channelURL)
+			if _, sendErr := h.bot.Send(msg); sendErr != nil {
+				log.Printf("[bot] Send error: %v", sendErr)
+			}
+			break
+		}
+		msg := tgbotapi.NewMessage(q.Message.Chat.ID, msgShareOfficial)
+		msg.ReplyMarkup = SharePhoneKeyboard()
+		if _, err := h.bot.Send(msg); err != nil {
+			log.Printf("[bot] Send error: %v", err)
+		}
+	case "share_phone":
+		if h.channelID != 0 {
+			member, err := telegram.IsUserMember(ctx, h.bot.Token, h.channelID, q.From.ID)
+			if err != nil || !member {
+				if h.channelURL != "" {
+					msg := tgbotapi.NewMessage(q.Message.Chat.ID, msgSubscribe)
+					msg.ReplyMarkup = SubscribeInlineMarkup(h.channelURL)
+					if _, sendErr := h.bot.Send(msg); sendErr != nil {
+						log.Printf("[bot] Send error: %v", sendErr)
+					}
+				} else {
+					h.send(q.Message.Chat.ID, "Канал для подписки не настроен. Напишите администратору.")
+				}
+				break
+			}
+		}
 		// Показываем только официальную кнопку Telegram «Поделиться контактом» — номер подделать нельзя
 		msg := tgbotapi.NewMessage(q.Message.Chat.ID, msgShareOfficial)
 		msg.ReplyMarkup = SharePhoneKeyboard()
 		if _, err := h.bot.Send(msg); err != nil {
 			log.Printf("[bot] Send error: %v", err)
 		}
+	case "open_app":
+		h.send(q.Message.Chat.ID, "Ссылка на приложение будет добавлена позже.")
 	}
 	if _, err := h.bot.Request(tgbotapi.NewCallback(q.ID, "")); err != nil {
 		log.Printf("[bot] Answer callback error: %v", err)
@@ -149,22 +195,29 @@ func (h *Handler) handleContact(ctx context.Context, chatID int64, from *tgbotap
 		log.Printf("[bot] Send error: %v", err)
 		return
 	}
-	// Then show Open App button or clickable localhost link
-	appMsg := tgbotapi.NewMessage(chatID, "Нажмите кнопку ниже:")
-	if !IsLocalhostURL(h.webAppURL) {
-		appMsg.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
-	} else {
-		appMsg.Text = msgOpenLocalLink + "\n" + h.webAppURL
-	}
-	if _, err := h.bot.Send(appMsg); err != nil {
-		log.Printf("[bot] Send error: %v", err)
-	}
+	// Then show Open App button
+	h.sendAppCard(chatID)
 }
 
 func (h *Handler) send(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	if _, err := h.bot.Send(msg); err != nil {
 		log.Printf("[bot] Send error: %v", err)
+	}
+}
+
+func (h *Handler) sendAppCard(chatID int64) {
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(promoImagePath))
+	photo.Caption = msgWelcomeBack
+	photo.ReplyMarkup = OpenAppKeyboard()
+	if _, err := h.bot.Send(photo); err != nil {
+		log.Printf("[bot] Send photo error: %v", err)
+		// Fallback to text button if image fails
+		msg := tgbotapi.NewMessage(chatID, msgWelcomeBack)
+		msg.ReplyMarkup = OpenAppKeyboard()
+		if _, sendErr := h.bot.Send(msg); sendErr != nil {
+			log.Printf("[bot] Send error: %v", sendErr)
+		}
 	}
 }
 

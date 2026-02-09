@@ -35,12 +35,20 @@ func SharePhoneInlineMarkup() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-func OpenAppKeyboard(webAppURL string) tgbotapi.InlineKeyboardMarkup {
-	// Используем URL-кнопку — в Telegram откроется WebView с Mini App.
-	// Для нативной Mini App нужна кнопка web_app (если библиотека поддерживает).
+// SubscribeInlineMarkup — кнопки «Подписаться» + «Я подписался».
+func SubscribeInlineMarkup(channelURL string) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("🎰 Открыть приложение", webAppURL),
+			tgbotapi.NewInlineKeyboardButtonURL("📣 Подписаться", channelURL),
+			tgbotapi.NewInlineKeyboardButtonData("✅ Я подписался", "check_subscribe"),
+		),
+	)
+}
+
+func OpenAppKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🎰 Открыть приложение", "open_app"),
 		),
 	)
 }

@@ -34,10 +34,10 @@ func (s *UserService) GetUserState(ctx context.Context, user *domain.User, spinL
 		return nil, err
 	}
 	return &UserState{
-		User:           user,
-		SpinAvailable:  spinCount < spinLimit,
-		SpinsUsed:      spinCount,
-		SpinLimit:      spinLimit,
+		User:          user,
+		SpinAvailable: spinCount < spinLimit,
+		SpinsUsed:     spinCount,
+		SpinLimit:     spinLimit,
 	}, nil
 }
 

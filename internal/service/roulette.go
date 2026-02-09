@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"era_sporta_bot_ruletka/internal/domain"
 	"era_sporta_bot_ruletka/internal/repository"
@@ -49,6 +50,7 @@ func (s *RouletteService) Spin(ctx context.Context, userID int64, ipHash string)
 	if err != nil {
 		return nil, fmt.Errorf("list prizes: %w", err)
 	}
+	prizes = filterDisabledPrizes(prizes)
 	if len(prizes) == 0 {
 		return nil, fmt.Errorf("no active prizes")
 	}
@@ -115,6 +117,25 @@ func (s *RouletteService) Spin(ctx context.Context, userID int64, ipHash string)
 	}
 
 	return &domain.SpinWithPrize{Spin: *spin, Prize: chosen}, nil
+}
+
+const disabledPrizeName = "Безлимит посещений на 1 месяц"
+
+func filterDisabledPrizes(prizes []*domain.Prize) []*domain.Prize {
+	if len(prizes) == 0 {
+		return prizes
+	}
+	out := prizes[:0]
+	for _, p := range prizes {
+		if p == nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(p.Name), disabledPrizeName) {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func (s *RouletteService) GetConfig(ctx context.Context) ([]*domain.Prize, error) {

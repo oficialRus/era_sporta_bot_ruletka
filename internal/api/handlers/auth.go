@@ -25,7 +25,7 @@ type AuthRequest struct {
 }
 
 type AuthResponse struct {
-	User  *UserDTO  `json:"user"`
+	User  *UserDTO      `json:"user"`
 	State *UserStateDTO `json:"state"`
 }
 
