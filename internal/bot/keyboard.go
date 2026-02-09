@@ -45,10 +45,17 @@ func SubscribeInlineMarkup(channelURL string) tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-func OpenAppKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🎰 Открыть приложение", "open_app"),
-		),
-	)
+func OpenAppKeyboard(webAppURL string) map[string]interface{} {
+	return map[string]interface{}{
+		"inline_keyboard": [][]map[string]interface{}{
+			{
+				{
+					"text": "🎰 Открыть приложение",
+					"web_app": map[string]string{
+						"url": webAppURL,
+					},
+				},
+			},
+		},
+	}
 }

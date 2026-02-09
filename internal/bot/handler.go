@@ -150,8 +150,6 @@ func (h *Handler) handleCallback(ctx context.Context, q *tgbotapi.CallbackQuery)
 		if _, err := h.bot.Send(msg); err != nil {
 			log.Printf("[bot] Send error: %v", err)
 		}
-	case "open_app":
-		h.send(q.Message.Chat.ID, "Ссылка на приложение будет добавлена позже.")
 	}
 	if _, err := h.bot.Request(tgbotapi.NewCallback(q.ID, "")); err != nil {
 		log.Printf("[bot] Answer callback error: %v", err)
@@ -209,12 +207,12 @@ func (h *Handler) send(chatID int64, text string) {
 func (h *Handler) sendAppCard(chatID int64) {
 	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(promoImagePath))
 	photo.Caption = msgWelcomeBack
-	photo.ReplyMarkup = OpenAppKeyboard()
+	photo.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
 	if _, err := h.bot.Send(photo); err != nil {
 		log.Printf("[bot] Send photo error: %v", err)
 		// Fallback to text button if image fails
 		msg := tgbotapi.NewMessage(chatID, msgWelcomeBack)
-		msg.ReplyMarkup = OpenAppKeyboard()
+		msg.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
 		if _, sendErr := h.bot.Send(msg); sendErr != nil {
 			log.Printf("[bot] Send error: %v", sendErr)
 		}
