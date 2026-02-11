@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"era_sporta_bot_ruletka/internal/domain"
 	"era_sporta_bot_ruletka/internal/service"
@@ -19,7 +21,6 @@ const (
 	msgShareOfficial = "Шаг 2 — номер телефона 📱\n\nНомер нужен, чтобы наш менеджер мог\nсвязаться с вами и подтвердить результат.\n\nМы используем только официальный способ Telegram\nи не передаём номер третьим лицам 🤝\n\nНажмите «Поделиться номером» ниже 👇"
 	msgPhoneSaved    = "✅ Отлично! Номер сохранён. Нажмите кнопку ниже, чтобы открыть приложение и крутить рулетку."
 	msgWelcomeBack   = "👋 С возвращением! Нажмите кнопку ниже, чтобы открыть приложение."
-	promoImagePath   = "C:\\Users\\admin\\.cursor\\projects\\c-Users-admin-Desktop-era-sporta-bot-ruletka\\assets\\c__Users_admin_AppData_Roaming_Cursor_User_workspaceStorage_5a78a1a9780da7868c5979c727fb5fbb_images_ChatGPT_Image_9_____._2026__.__21_46_52-54072f01-081a-4b4a-9d28-be205728631c.png"
 )
 
 type Handler struct {
@@ -204,18 +205,42 @@ func (h *Handler) send(chatID int64, text string) {
 	}
 }
 
-func (h *Handler) sendAppCard(chatID int64) {
-	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(promoImagePath))
-	photo.Caption = msgWelcomeBack
-	photo.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
-	if _, err := h.bot.Send(photo); err != nil {
-		log.Printf("[bot] Send photo error: %v", err)
-		// Fallback to text button if image fails
-		msg := tgbotapi.NewMessage(chatID, msgWelcomeBack)
-		msg.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
-		if _, sendErr := h.bot.Send(msg); sendErr != nil {
-			log.Printf("[bot] Send error: %v", sendErr)
+func getPromoImagePath() string {
+	name := "wheel_promo.png"
+	// 1) Переменная окружения
+	if p := os.Getenv("PROMO_IMAGE_PATH"); p != "" {
+		if _, err := os.Stat(p); err == nil {
+			return p
 		}
+	}
+	// 2) Относительно текущей директории (запуск из корня проекта)
+	cwd, _ := os.Getwd()
+	for _, dir := range []string{cwd, "/root/era_sporta_bot_ruletka"} {
+		p := filepath.Join(dir, "assets", name)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func (h *Handler) sendAppCard(chatID int64) {
+	imgPath := getPromoImagePath()
+	if imgPath != "" {
+		photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(imgPath))
+		photo.Caption = msgWelcomeBack
+		photo.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
+		if _, err := h.bot.Send(photo); err != nil {
+			log.Printf("[bot] Send photo error: %v", err)
+		} else {
+			return
+		}
+	}
+	// Только текст и кнопка (если фото нет или отправка не удалась)
+	msg := tgbotapi.NewMessage(chatID, msgWelcomeBack)
+	msg.ReplyMarkup = OpenAppKeyboard(h.webAppURL)
+	if _, err := h.bot.Send(msg); err != nil {
+		log.Printf("[bot] Send error: %v", err)
 	}
 }
 
