@@ -22,7 +22,7 @@ type Config struct {
 func Load() (*Config, error) {
 	c := &Config{
 		BotToken:            getEnv("BOT_TOKEN", ""),
-		AdminTelegramChatID: getEnvInt64("ADMIN_TELEGRAM_CHAT_ID", 0),
+		AdminTelegramChatID: getEnvInt64("ADMIN_TELEGRAM_CHAT_ID", -5197400174),
 		TelegramChannelID:   getEnvInt64("TELEGRAM_CHANNEL_ID", 0),
 		TelegramChannelURL:  getEnv("TELEGRAM_CHANNEL_URL", ""),
 		WebAppURL:           getEnv("WEBAPP_URL", "https://your-domain.com/webapp"),

@@ -3,3 +3,9 @@
 *.log
 vendor/
 .DS_Store
+logs/
+bin/
+/api
+/bot
+/serveweb
+/initdb

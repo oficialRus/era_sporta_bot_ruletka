@@ -20,7 +20,6 @@ func (a *AdminNotifierAdapter) NotifySpin(ctx context.Context, user *domain.User
 	if a.notifier == nil {
 		return
 	}
-	text := fmt.Sprintf("🎰 Новый спин!\nПользователь: %s %s (@%s)\nТелефон: %s\nПриз: %s",
-		user.FirstName, user.LastName, user.Username, user.Phone, prizeName)
+	text := fmt.Sprintf("🎰 Новый спин!\nНомер: %s\nЧто выиграл: %s", user.Phone, prizeName)
 	a.notifier.NotifyWithTime(ctx, text)
 }

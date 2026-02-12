@@ -50,19 +50,23 @@ func (s *RouletteService) Spin(ctx context.Context, userID int64, ipHash string)
 	if err != nil {
 		return nil, fmt.Errorf("list prizes: %w", err)
 	}
-	prizes = filterDisabledPrizes(prizes)
 	if len(prizes) == 0 {
 		return nil, fmt.Errorf("no active prizes")
 	}
 
-	// Weighted random
+	// Weighted random from allowed prizes only.
+	randomPrizes := filterAllowedPrizes(prizes)
+	if len(randomPrizes) == 0 {
+		return nil, fmt.Errorf("no random prizes configured")
+	}
+
 	var totalWeight int
-	for _, p := range prizes {
+	for _, p := range randomPrizes {
 		totalWeight += p.ProbabilityWeight
 	}
 	rnd := rand.Intn(totalWeight)
 	var chosen *domain.Prize
-	for _, p := range prizes {
+	for _, p := range randomPrizes {
 		rnd -= p.ProbabilityWeight
 		if rnd < 0 {
 			chosen = p
@@ -70,7 +74,7 @@ func (s *RouletteService) Spin(ctx context.Context, userID int64, ipHash string)
 		}
 	}
 	if chosen == nil {
-		chosen = prizes[len(prizes)-1]
+		chosen = randomPrizes[len(randomPrizes)-1]
 	}
 
 	spin := &domain.Spin{
@@ -120,8 +124,10 @@ func (s *RouletteService) Spin(ctx context.Context, userID int64, ipHash string)
 }
 
 const disabledPrizeName = "Безлимит посещений на 1 месяц"
+const disabledPrizeNameAlt = "1 месяц бесплатно"
+const disabledPrizeType = "free_month"
 
-func filterDisabledPrizes(prizes []*domain.Prize) []*domain.Prize {
+func filterAllowedPrizes(prizes []*domain.Prize) []*domain.Prize {
 	if len(prizes) == 0 {
 		return prizes
 	}
@@ -130,12 +136,24 @@ func filterDisabledPrizes(prizes []*domain.Prize) []*domain.Prize {
 		if p == nil {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(p.Name), disabledPrizeName) {
+		if isDisallowedPrize(p) {
 			continue
 		}
 		out = append(out, p)
 	}
 	return out
+}
+
+func isDisallowedPrize(p *domain.Prize) bool {
+	if p == nil {
+		return true
+	}
+	name := strings.TrimSpace(p.Name)
+	prizeType := strings.TrimSpace(p.Type)
+	if strings.EqualFold(name, disabledPrizeName) || strings.EqualFold(name, disabledPrizeNameAlt) {
+		return true
+	}
+	return strings.EqualFold(prizeType, disabledPrizeType)
 }
 
 func (s *RouletteService) GetConfig(ctx context.Context) ([]*domain.Prize, error) {

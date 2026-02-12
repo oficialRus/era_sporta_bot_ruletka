@@ -36,6 +36,21 @@
       padding: 24px 16px 32px;
       position: relative;
     }
+    .club-logo-wrap {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 0px) + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(110px, 34vw);
+      z-index: 5;
+      pointer-events: none;
+    }
+    .club-logo {
+      display: block;
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
 
     .pointer {
       width: 0;
@@ -260,6 +275,9 @@
 </head>
 <body>
   <div class="screen">
+    <div class="club-logo-wrap" id="clubLogoWrap" aria-hidden="true">
+      <img class="club-logo" src="./logo.png" alt="Логотип клуба" id="clubLogo">
+    </div>
     <div class="pointer" aria-hidden="true"></div>
     <div class="wheel-outer">
       <div class="wheel-dots" id="wheelDots"></div>
@@ -291,7 +309,7 @@
     let state = null;
     let currentRotation = 0;
     let isSpinning = false;
-    let demoSpinUsed = false;
+    let authResolved = false;
 
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.ready();
@@ -303,12 +321,76 @@
     const resultEl = document.getElementById('result');
     const spinBtn = document.getElementById('spinBtn');
     const wheelPop = document.getElementById('wheelPop');
-    const LABELS = Array.from(document.querySelectorAll('.wheel-label span')).map(el => el.textContent.trim());
-    const DISABLED_PRIZE = 'БЕЗЛИМИТ ПОСЕЩЕНИЙ НА 1 МЕСЯЦ';
-    const ALLOWED_SEGMENTS = LABELS
-      .map((label, idx) => ({ label, idx }))
-      .filter(item => item.label !== DISABLED_PRIZE)
-      .map(item => item.idx);
+    const clubLogo = document.getElementById('clubLogo');
+    const clubLogoWrap = document.getElementById('clubLogoWrap');
+    const labelNodes = Array.from(document.querySelectorAll('.wheel-label span'));
+    let LABELS = labelNodes.map(el => el.textContent.trim());
+    const DISABLED_PRIZES = new Set(['БЕЗЛИМИТ ПОСЕЩЕНИЙ НА 1 МЕСЯЦ', '1 МЕСЯЦ БЕСПЛАТНО']);
+    spinBtn.disabled = true;
+    spinBtn.style.display = 'none';
+    if (clubLogo && clubLogoWrap) {
+      clubLogo.addEventListener('error', () => {
+        clubLogoWrap.style.display = 'none';
+      });
+    }
+
+    function normalizePrizeName(name) {
+      return String(name || '').trim().toUpperCase();
+    }
+
+    function isDisabledPrizeName(name) {
+      return DISABLED_PRIZES.has(normalizePrizeName(name));
+    }
+
+    function getAllowedSegments() {
+      return LABELS
+        .map((label, idx) => ({ label, idx }))
+        .filter(item => !isDisabledPrizeName(item.label))
+        .map(item => item.idx);
+    }
+
+    function setWheelLabels(newLabels) {
+      if (!Array.isArray(newLabels) || !newLabels.length) return;
+      const normalized = newLabels.map(v => String(v || '').trim()).filter(Boolean);
+      if (!normalized.length) return;
+      LABELS = labelNodes.map((_, idx) => normalized[idx % normalized.length]);
+      labelNodes.forEach((node, idx) => {
+        node.textContent = LABELS[idx];
+      });
+    }
+
+    function chooseSegmentForPrize(prizeName) {
+      const target = normalizePrizeName(prizeName);
+      let matches = LABELS
+        .map((label, idx) => ({ label, idx }))
+        .filter(item => normalizePrizeName(item.label) === target && !isDisabledPrizeName(item.label))
+        .map(item => item.idx);
+      if (matches.length > 0) {
+        return matches[Math.floor(Math.random() * matches.length)];
+      }
+      const fallbackPool = getAllowedSegments();
+      return fallbackPool.length
+        ? fallbackPool[Math.floor(Math.random() * fallbackPool.length)]
+        : 0;
+    }
+
+    async function loadRouletteConfig() {
+      try {
+        const res = await fetch(API_BASE + '/api/roulette/config');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const prizes = Array.isArray(data.prizes) ? data.prizes : [];
+        const names = prizes
+          .filter(p => p)
+          .map(p => String(p.name || '').trim())
+          .filter(Boolean);
+        if (names.length) {
+          setWheelLabels(names);
+        }
+      } catch (_) {
+        // keep static labels when config endpoint is unavailable
+      }
+    }
 
     (function initDots() {
       const container = document.getElementById('wheelDots');
@@ -365,7 +447,7 @@
         '</div>' +
         '<div class=\"win-title\">Вы выиграли: ' + prizeName + '</div>' +
         '<div class=\"win-instr\">Скринь и отправляй нашему менеджеру:</div>' +
-        '<a class=\"mgr\" href=\"https://t.me/RyslanNovikov\" target=\"_blank\" rel=\"noopener\">@RyslanNovikov</a>';
+        '<a class=\"mgr\" href=\"https://t.me/era_sporta_manager\" target=\"_blank\" rel=\"noopener\">@era_sporta_manager</a>';
     }
 
     function popWheelConfetti() {
@@ -396,10 +478,13 @@
     }
 
     async function auth() {
+      authResolved = false;
       if (!initData) {
         setResult('Откройте из Telegram (кнопка в боте).', 'hint');
-        spinBtn.disabled = false;
+        spinBtn.disabled = true;
+        spinBtn.style.display = 'none';
         spinBtn.textContent = 'КРУТИТЬ РУЛЕТКУ';
+        authResolved = true;
         return false;
       }
       const res = await fetch(API_BASE + '/api/auth', {
@@ -410,25 +495,47 @@
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setResult(d.message || 'Сначала поделитесь номером в боте.', 'error');
-        spinBtn.disabled = false;
+        spinBtn.disabled = true;
+        spinBtn.style.display = 'none';
+        authResolved = true;
         return false;
       }
       const data = await res.json();
       state = data.state;
-      setResult(state.spin_available ? '' : 'Спин уже использован.', state.spin_available ? '' : 'hint');
-      spinBtn.disabled = !state.spin_available;
-      spinBtn.textContent = 'КРУТИТЬ РУЛЕТКУ';
+      authResolved = true;
+      if (!state || !state.spin_available) {
+        setResult('Спин уже использован.', 'hint');
+        spinBtn.disabled = true;
+        spinBtn.style.display = 'none';
+      } else {
+        setResult('', '');
+        spinBtn.disabled = false;
+        spinBtn.style.display = 'block';
+        spinBtn.textContent = 'КРУТИТЬ РУЛЕТКУ';
+      }
       return true;
     }
 
     spinBtn.addEventListener('click', async () => {
       if (isSpinning) return;
-      if (!initData && demoSpinUsed) {
-        setResult('Спин уже использован.', 'hint');
+      if (!authResolved) {
+        setResult('Проверяем доступ к спину...', 'hint');
+        spinBtn.disabled = true;
+        return;
+      }
+      if (!initData) {
+        setResult('Откройте из Telegram (кнопка в боте).', 'hint');
+        spinBtn.disabled = true;
+        return;
+      }
+      if (!state) {
+        setResult('Не удалось загрузить статус пользователя.', 'error');
+        spinBtn.disabled = true;
         return;
       }
       if (state && !state.spin_available) {
         setResult('Спин уже использован.', 'hint');
+        spinBtn.disabled = true;
         return;
       }
       isSpinning = true;
@@ -436,50 +543,60 @@
       spinBtn.textContent = 'Крутим…';
       setResult('');
 
-      const winSegment = ALLOWED_SEGMENTS[Math.floor(Math.random() * ALLOWED_SEGMENTS.length)];
-      spinWheelToSegment(winSegment);
-
       let res = null;
       let data = {};
-      if (initData) {
-        res = await fetch(API_BASE + '/api/roulette/spin', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData
-          }
-        });
-        data = await res.json().catch(() => ({}));
+      res = await fetch(API_BASE + '/api/roulette/spin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': initData
+        }
+      });
+      data = await res.json().catch(() => ({}));
+
+      if (res && !res.ok) {
+        isSpinning = false;
+        const errMsg = data && (data.message || data.error) ? (data.message || data.error) : 'Не удалось выполнить спин. Попробуйте позже.';
+        setResult(errMsg, 'error');
+        if (state && data && (data.error === 'spin limit exceeded' || data.message === 'Вы уже использовали свой спин')) {
+          state.spin_available = false;
+          spinBtn.style.display = 'none';
+        } else {
+          spinBtn.disabled = false;
+          spinBtn.style.display = 'block';
+          spinBtn.textContent = 'КРУТИТЬ РУЛЕТКУ';
+        }
+        return;
       }
 
-      setTimeout(() => {
-        isSpinning = false;
-        spinBtn.disabled = false;
-        spinBtn.textContent = 'ХОЧУ ЕЩЕ КРУТИТЬ';
-        popWheelConfetti();
-
-        if (res && !res.ok) {
-          setResult(data.message || data.error || 'Ошибка', 'error');
-          return;
-        }
-
-        if (res && data && data.spin && data.spin.prize_name) {
-          const prizeName = data.spin.prize_name === DISABLED_PRIZE
-            ? (LABELS[winSegment] || 'ПРИЗ')
-            : data.spin.prize_name;
+      if (res && data && data.spin && data.spin.prize_name) {
+        const prizeName = String(data.spin.prize_name || '').trim() || 'ПРИЗ';
+        const serverSegment = Number(data.spin.stop_segment);
+        const hasServerSegment = Number.isInteger(serverSegment)
+          && serverSegment >= 0
+          && serverSegment < SEGMENTS
+          && !isDisabledPrizeName(LABELS[serverSegment]);
+        const targetSegment = hasServerSegment ? serverSegment : chooseSegmentForPrize(prizeName);
+        spinWheelToSegment(targetSegment);
+        setTimeout(() => {
+          isSpinning = false;
+          popWheelConfetti();
           showWinMessage(prizeName);
           if (state) state.spin_available = false;
           spinBtn.disabled = true;
-          return;
-        }
+          spinBtn.style.display = 'none';
+        }, 4300);
+        return;
+      }
 
-        const fallbackPrize = LABELS[winSegment] || 'ПРИЗ';
-        showWinMessage(fallbackPrize);
-        demoSpinUsed = true;
-        spinBtn.disabled = true;
-      }, 4300);
+      isSpinning = false;
+      setResult('Не удалось получить результат спина.', 'error');
+      spinBtn.disabled = false;
+      spinBtn.style.display = 'block';
+      spinBtn.textContent = 'КРУТИТЬ РУЛЕТКУ';
     });
 
+    loadRouletteConfig();
     auth();
   </script>
 </body>
