@@ -29,10 +29,11 @@ func (n *Notifier) Notify(ctx context.Context, text string) {
 	for idx, chatID := range candidates {
 		msg := tgbotapi.NewMessage(chatID, text)
 		if _, err := n.bot.Send(msg); err != nil {
-			if idx == len(candidates)-1 || !isChatNotFound(err) {
+			if idx == len(candidates)-1 || !isRetryableChatIDError(err) {
 				log.Printf("[notify] Send to admin error (chat_id=%d): %v", chatID, err)
 				return
 			}
+			log.Printf("[notify] Retrying notification with fallback chat_id after error (chat_id=%d): %v", chatID, err)
 			continue
 		}
 		if chatID != n.chatID {
@@ -58,9 +59,12 @@ func candidateChatIDs(chatID int64) []int64 {
 	return ids
 }
 
-func isChatNotFound(err error) bool {
+func isRetryableChatIDError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "chat not found")
+	e := strings.ToLower(err.Error())
+	return strings.Contains(e, "chat not found") ||
+		strings.Contains(e, "group chat was upgraded to a supergroup chat") ||
+		strings.Contains(e, "chat was upgraded to a supergroup")
 }
