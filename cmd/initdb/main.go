@@ -96,23 +96,18 @@ CREATE TABLE IF NOT EXISTS prizes (
 );`,
 
 		`-- Insert default prizes if table is empty
-INSERT INTO prizes (name, type, value, probability_weight)
-SELECT * FROM (VALUES
-    ('Скидка 10%', 'discount', 10, 30),
-    ('Скидка 20%', 'discount', 20, 15),
-    ('1 месяц бесплатно', 'free_month', 1, 5),
-    ('Скидка 5%', 'discount', 5, 50)
-) AS v(name, type, value, probability_weight)
-WHERE NOT EXISTS (SELECT 1 FROM prizes LIMIT 1);`,
-
-		`-- Insert first-spin fixed prize if missing
 INSERT INTO prizes (name, type, value, probability_weight, is_active)
-SELECT 'БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА', 'free_days', 7, 1, true
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM prizes
-    WHERE LOWER(TRIM(name)) = LOWER(TRIM('БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА'))
-);`,
+SELECT * FROM (VALUES
+    ('БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА',                           'free_days',  7,  20, true),
+    ('БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА',                           'free_days',  7,  20, true),
+    ('ЗАРЯЖЕННЫЙ ФИТНЕС-ИНТЕНСИВ 🔥',                       'bonus',      1,  25, true),
+    ('ШЕЙПИНГ — ГРУППОВАЯ ТРЕНИРОВКА ДЛЯ ФОРМЫ И РЕЛЬЕФА', 'bonus',      1,  25, true),
+    ('БЕЗЛИМИТ ПОСЕЩЕНИЙ НА 1 МЕСЯЦ',                       'free_month', 1,   1, true),
+    ('1 ДЕНЬ В ЭРА СПОРТА + МИНИ-ПРОГРАММА ТРЕНИРОВОК',     'free_days',  1,  25, true),
+    ('СКИДКА НА ГОДОВОЙ АБОНЕМЕНТ',                         'discount',   1,  15, true),
+    ('10% НА МАССАЖ / ВОССТАНОВЛЕНИЕ',                      'discount',   10, 25, true)
+) AS v(name, type, value, probability_weight, is_active)
+WHERE NOT EXISTS (SELECT 1 FROM prizes LIMIT 1);`,
 
 		`-- Migration 003: Create spins table
 CREATE TABLE IF NOT EXISTS spins (

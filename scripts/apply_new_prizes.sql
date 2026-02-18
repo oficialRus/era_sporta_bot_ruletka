@@ -1,7 +1,10 @@
--- Очистка всех данных БД (таблицы остаются)
-TRUNCATE TABLE spins, users, prizes RESTART IDENTITY CASCADE;
+-- Деактивируем все старые призы (историю спинов не трогаем)
+UPDATE prizes SET is_active = false;
 
--- Восстановление призов по умолчанию
+-- Синхронизируем последовательность с текущим максимальным id
+SELECT setval('prizes_id_seq', (SELECT MAX(id) FROM prizes));
+
+-- Вставляем 8 новых призов
 INSERT INTO prizes (name, type, value, probability_weight, is_active) VALUES
     ('БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА',                           'free_days',  7,  20, true),
     ('БЕСПЛАТНЫЕ 7 ДНЕЙ ФИТНЕСА',                           'free_days',  7,  20, true),
@@ -11,3 +14,6 @@ INSERT INTO prizes (name, type, value, probability_weight, is_active) VALUES
     ('1 ДЕНЬ В ЭРА СПОРТА + МИНИ-ПРОГРАММА ТРЕНИРОВОК',     'free_days',  1,  25, true),
     ('СКИДКА НА ГОДОВОЙ АБОНЕМЕНТ',                         'discount',   1,  15, true),
     ('10% НА МАССАЖ / ВОССТАНОВЛЕНИЕ',                      'discount',   10, 25, true);
+
+-- Проверка результата
+SELECT id, name, is_active FROM prizes ORDER BY id;
